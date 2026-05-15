@@ -7,3 +7,14 @@ build/bin/
 *.log
 wechat_raw_debug.html
 frontend/src/**/*.js.map
+frontend/package.json.md5
+
+# 编辑器/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+Thumbs.db
+.DS_Store
