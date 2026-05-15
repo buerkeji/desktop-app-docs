@@ -1,0 +1,9 @@
+frontend/node_modules/
+frontend/dist/
+build/bin/
+*.exe
+*.dll
+*.db
+*.log
+wechat_raw_debug.html
+frontend/src/**/*.js.map
