@@ -104,13 +104,40 @@ const handleClearHistory = ctx.handleClearHistory;
 .batch-results-table__row {
   display: flex;
   gap: 8px;
-  padding: 6px 0;
+  padding: 8px 12px;
   font-size: 13px;
 }
 .batch-results-table__header {
   font-weight: 600;
+  background-color: var(--color-fill-2, #f7f8fa);
   border-bottom: 1px solid var(--color-border, #e5e6e8);
 }
+
+.batch-results-table__row {
+  border-bottom: 1px solid var(--color-border, #e5e6e8);
+  transition: background-color 0.15s;
+}
+
+.batch-results-table__row:last-child {
+  border-bottom: none;
+}
+
+.batch-results-table__row:hover {
+  background-color: var(--color-fill-1, #f2f3f5);
+}
+
+.batch-results-table__row--success {
+  background-color: var(--color-success-light-1, #e8ffea);
+}
+
+.batch-results-table__row--failed {
+  background-color: var(--color-danger-light-1, #ffece8);
+}
+
+.batch-results-table__row--collecting {
+  background-color: var(--color-primary-light-1, #e8f3ff);
+}
+
 .batch-progress__summary {
   font-size: 14px;
   margin-bottom: 8px;
@@ -118,5 +145,24 @@ const handleClearHistory = ctx.handleClearHistory;
 .batch-results-table__col-url { flex: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-results-table__col-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .batch-results-table__col-status { flex: 0 0 80px; }
-.batch-results-table__col-draft { flex: 0 0 100px; }
+.batch-results-table__col-draft {
+  flex: 0 0 110px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.batch-results-table__draft-hint {
+  font-size: 12px;
+  color: var(--color-text-3, #86909c);
+}
+
+.batch-results-table__error {
+  font-size: 12px;
+  color: var(--color-danger, #f53f3f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100px;
+}
 </style>

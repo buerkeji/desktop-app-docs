@@ -105,3 +105,125 @@ const resultSeoKeywords = ctx.resultSeoKeywords;
     </a-space>
   </a-card>
 </template>
+
+<style scoped>
+.collector-summary__hero h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.collector-summary__hero p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-2, #4e5969);
+  line-height: 1.5;
+}
+
+.collector-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.collector-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.collector-stat__label {
+  font-size: 12px;
+  color: var(--color-text-3, #86909c);
+}
+
+.collector-stat__value {
+  font-size: 14px;
+  color: var(--color-text-1, #1d2129);
+}
+
+.collector-summary-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.collector-summary-block__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-3, #86909c);
+}
+
+.collector-summary-block__url {
+  margin: 0;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.collector-summary-block__empty {
+  font-size: 13px;
+  color: var(--color-text-3, #86909c);
+}
+
+.collector-media-preview-list {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.collector-media-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+  font-size: 12px;
+  color: var(--color-text-2, #4e5969);
+}
+
+.collector-media-preview img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border: 1px solid var(--color-border, #e5e6e8);
+  border-radius: 4px;
+  background: #fff;
+}
+
+.collector-chip-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.collector-image-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.collector-image-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-3, #86909c);
+  overflow: hidden;
+}
+
+.collector-image-item img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #e5e6e8);
+}
+
+.collector-image-item span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+</style>

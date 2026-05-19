@@ -53,6 +53,7 @@ export function useCollectorPage() {
     batchResults,
     batchProgress,
     batchDraftType,
+    batchStatus,
   } = storeToRefs(collectorStore);
 
   interface PickerFieldOption {
@@ -116,7 +117,7 @@ export function useCollectorPage() {
   const scanSitemap = ref(true);
   const scanFilterRules = ref<ScanFilterRule[]>([]);
   const scannedSelectedLinks = ref<Set<string>>(new Set());
-  let currentScanHost = '';
+  const currentScanHost = ref('');
 
   const SCAN_OPERATOR_OPTIONS = [
     { value: 'contains', label: '包含' },
@@ -212,7 +213,7 @@ export function useCollectorPage() {
   const pickerEnabled = computed(() => Boolean(baseResult.value?.finalUrl?.trim()));
   const activeRuleHost = computed(() => currentRule.value?.host || extractHost(result.value?.finalUrl || baseResult.value?.finalUrl || sourceUrl.value));
   const hasCurrentRule = computed(() => Boolean(currentRule.value && !isCollectorSiteRuleEmpty(currentRule.value)));
-  const hasScanSettings = computed(() => Boolean(currentScanHost && loadCollectorScanSettings(currentScanHost)));
+  const hasScanSettings = computed(() => Boolean(currentScanHost.value && loadCollectorScanSettings(currentScanHost.value)));
   const pickerPreviewHtml = computed(() => buildPickerFrameHtml(baseResult.value));
   const quickImageChoices = computed<QuickImageChoice[]>(() => {
     const choices: QuickImageChoice[] = [];
@@ -1301,39 +1302,42 @@ export function useCollectorPage() {
         const rule = await getCollectorSiteRule(itemHost);
         const refined = rule ? applyCollectorSiteRule(payload, rule) : payload;
 
+        const batchToolMapping = buildDefaultToolMapping(refined);
+        const batchArticleMapping = buildDefaultArticleMapping(refined);
+
         collectorStore.updateBatchItem(index, {
           url,
-          title: refined.title,
+          title: batchToolMapping.title || refined.title,
           status: 'success',
-          ruleHost: itemHost || undefined,
+          ruleHost: rule ? itemHost : undefined,
         });
 
         const toolTargetId = buildCollectorDraftId('tool');
         const articleTargetId = buildCollectorDraftId('article');
 
-        if (toolTargetId && currentTenantId.value) {
+        if (toolTargetId && currentTenantId.value && (batchDraftType.value === 'tool' || batchDraftType.value === 'both')) {
           await saveLocalDraft(buildLocalDraftKey(currentTenantId.value, 'tool', toolTargetId), {
             tenantId: currentTenantId.value,
             contentType: 'tool',
             targetId: toolTargetId,
-            title: toolMapping.title || refined.title || '采集草稿',
-            payload: { content: refined.contentHtml, sourceUrl: refined.finalUrl, collectedFrom: url },
+            title: batchToolMapping.title || refined.title || '采集草稿',
+            payload: buildToolDraftPayload(batchToolMapping),
           });
         }
 
-        if (articleTargetId && currentTenantId.value) {
+        if (articleTargetId && currentTenantId.value && (batchDraftType.value === 'article' || batchDraftType.value === 'both')) {
           await saveLocalDraft(buildLocalDraftKey(currentTenantId.value, 'article', articleTargetId), {
             tenantId: currentTenantId.value,
             contentType: 'article',
             targetId: articleTargetId,
-            title: articleMapping.title || refined.title || '采集草稿',
-            payload: { content: refined.contentHtml, sourceUrl: refined.finalUrl, collectedFrom: url },
+            title: batchArticleMapping.title || refined.title || '采集草稿',
+            payload: buildArticleDraftPayload(batchArticleMapping),
           });
         }
 
         collectorStore.updateBatchItem(index, {
-          toolDraftId: toolTargetId,
-          articleDraftId: articleTargetId,
+          toolDraftId: batchDraftType.value === 'tool' || batchDraftType.value === 'both' ? toolTargetId : undefined,
+          articleDraftId: batchDraftType.value === 'article' || batchDraftType.value === 'both' ? articleTargetId : undefined,
         });
       } catch {
         collectorStore.updateBatchItem(index, {
@@ -1414,6 +1418,7 @@ export function useCollectorPage() {
       });
       scanResult.value = result;
       scannedSelectedLinks.value = new Set(result.links.map((link: SiteLinkItem) => link.url));
+      persistScanSettings();
       Message.success(`扫描完成，发现 ${result.links.length} 个链接`);
     } catch (error) {
       Message.error(error instanceof Error ? error.message : '扫描失败');
@@ -1424,10 +1429,12 @@ export function useCollectorPage() {
 
   function addScanFilterRule() {
     scanFilterRules.value = [...scanFilterRules.value, { field: 'url', operator: 'contains', value: '' }];
+    persistScanSettings();
   }
 
   function removeScanFilterRule(index: number) {
     scanFilterRules.value = scanFilterRules.value.filter((_: ScanFilterRule, i: number) => i !== index);
+    persistScanSettings();
   }
 
   function updateScanFilterRule(index: number, key: 'field' | 'operator' | 'value', value: string) {
@@ -1435,6 +1442,7 @@ export function useCollectorPage() {
       const rules = [...scanFilterRules.value];
       rules[index] = { ...rules[index], [key]: value };
       scanFilterRules.value = rules;
+      persistScanSettings();
     }
   }
 
@@ -1550,8 +1558,8 @@ export function useCollectorPage() {
 
   watch(scanUrl, (value) => {
     const host = extractScanSettingsHost(value);
-    if (host && host !== currentScanHost) {
-      currentScanHost = host;
+    if (host && host !== currentScanHost.value) {
+      currentScanHost.value = host;
       applyScanSettingsFromHost(host);
     }
   });
@@ -1560,7 +1568,7 @@ export function useCollectorPage() {
     await initialiseDesktopContext(siteStore, authStore);
     const host = extractScanSettingsHost(scanUrl.value);
     if (host) {
-      currentScanHost = host;
+      currentScanHost.value = host;
       applyScanSettingsFromHost(host);
     }
 
@@ -1588,7 +1596,7 @@ export function useCollectorPage() {
 
   return {
     router, siteStore, authStore, collectorStore,
-    batchUrlsText, batchResults, batchProgress, batchDraftType,
+    batchUrlsText, batchResults, batchProgress, batchDraftType, batchStatus,
     sourceUrl, collecting, draftGenerating, previewMode, baseResult, result,
     draftMappingTab, syncingTenants, pickerField, pickerStatus, pickerLastValue,
     currentRule, pickerFrameRef, pickerSelectionSummary, pickerBrokenImageCount,

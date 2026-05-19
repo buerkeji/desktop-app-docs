@@ -302,3 +302,87 @@ const SCAN_OPERATOR_OPTIONS = ctx.SCAN_OPERATOR_OPTIONS;
     </a-space>
   </a-card>
 </template>
+
+<style scoped>
+.scan-summary {
+  padding: 8px 0;
+}
+
+.scan-actions {
+  padding: 8px 0;
+}
+
+.scan-filter-rule-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.scan-links-table {
+  width: 100%;
+  border: 1px solid var(--color-border, #e5e6e8);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.scan-links-table__header,
+.scan-links-table__row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.scan-links-table__header {
+  font-weight: 600;
+  background-color: var(--color-fill-2, #f7f8fa);
+  border-bottom: 1px solid var(--color-border, #e5e6e8);
+}
+
+.scan-links-table__row {
+  cursor: pointer;
+  transition: background-color 0.15s;
+  border-bottom: 1px solid var(--color-border, #e5e6e8);
+}
+
+.scan-links-table__row:last-child {
+  border-bottom: none;
+}
+
+.scan-links-table__row:hover {
+  background-color: var(--color-fill-1, #f2f3f5);
+}
+
+.scan-links-table__row--selected {
+  background-color: var(--color-primary-light-1, #e8f3ff);
+}
+
+.scan-links-table__col-check {
+  flex: 0 0 40px;
+  display: flex;
+  align-items: center;
+}
+
+.scan-links-table__col-title {
+  flex: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-links-table__col-url {
+  flex: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-2, #4e5969);
+  font-size: 12px;
+}
+
+.scan-links-table__col-source {
+  flex: 0 0 100px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+</style>

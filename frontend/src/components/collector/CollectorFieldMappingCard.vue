@@ -192,3 +192,24 @@ const createDraft = ctx.createDraft;
       </a-tabs>
     </a-card>
   </template>
+
+<style scoped>
+.collector-form-section {
+  margin-bottom: 16px;
+}
+
+.collector-form-section__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-1, #1d2129);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border, #e5e6e8);
+}
+
+.collector-content-editor {
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+</style>
