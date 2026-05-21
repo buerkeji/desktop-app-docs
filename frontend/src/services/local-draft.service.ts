@@ -47,6 +47,7 @@ interface LocalDraftBridgeListQuery {
 interface LocalDraftBridgeSaveInput extends LocalDraftBridgeQuery {
   title?: string;
   payloadJson: string;
+  submittedAt?: string;
 }
 
 interface LocalDraftBridgeItem {
@@ -57,6 +58,7 @@ interface LocalDraftBridgeItem {
   title?: string;
   payloadJson: string;
   updatedAt: string;
+  submittedAt?: string;
 }
 
 export interface LocalDraftListItem<T = unknown> extends LocalDraftEnvelope<T> {
@@ -94,11 +96,14 @@ function isStorageQuotaError(error: unknown): boolean {
   return error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED';
 }
 
-function cacheLocalStorageDraft<T>(key: string, draft: LocalDraftEnvelope<T>): void {
+function cacheLocalStorageDraft<T>(key: string, draft: LocalDraftEnvelope<T>, throwOnQuota = false): void {
   try {
     localStorage.setItem(key, JSON.stringify(draft));
   } catch (error) {
     if (!isStorageQuotaError(error)) {
+      throw error;
+    }
+    if (throwOnQuota) {
       throw error;
     }
   }
@@ -113,7 +118,7 @@ function writeLocalStorageDraft<T>(
     updatedAt: new Date().toISOString(),
     ...draft,
   };
-  cacheLocalStorageDraft(key, payload);
+  cacheLocalStorageDraft(key, payload, true);
   return payload;
 }
 
@@ -162,6 +167,7 @@ function mapBridgeDraft<T>(payload: LocalDraftBridgeItem): LocalDraftEnvelope<T>
       title: payload.title,
       payload: JSON.parse(payload.payloadJson) as T,
       updatedAt: payload.updatedAt,
+      submittedAt: payload.submittedAt,
     };
   } catch {
     return null;
@@ -209,6 +215,7 @@ export async function saveLocalDraft<T>(
         targetId: draft.targetId,
         title: draft.title ?? '',
         payloadJson: JSON.stringify(draft.payload),
+        submittedAt: draft.submittedAt || '',
       } satisfies LocalDraftBridgeSaveInput) as LocalDraftBridgeItem;
       const bridgeDraft = mapBridgeDraft<T>(result);
       if (bridgeDraft) {
@@ -228,26 +235,6 @@ export async function clearLocalDraft(key: string, query?: LocalDraftBridgeQuery
 
   if (query && canUseDraftBridge()) {
     await DeleteLocalDraft(query);
-  }
-}
-
-export async function markDraftSubmitted(key: string, query?: LocalDraftBridgeQuery): Promise<void> {
-  const draft = readLocalStorageDraft<Record<string, unknown>>(key);
-  if (draft) {
-    draft.submittedAt = new Date().toISOString();
-    writeLocalStorageDraft(key, draft as LocalDraftEnvelope<Record<string, unknown>>);
-  }
-
-  if (query && canUseDraftBridge()) {
-    try {
-      await SaveLocalDraft({
-        tenantId: query.tenantId,
-        contentType: query.contentType,
-        targetId: query.targetId,
-        title: draft?.title || '',
-        payloadJson: JSON.stringify({ ...(draft?.payload || {}), _submittedAt: new Date().toISOString() }),
-      });
-    } catch { /* ignore bridge errors */ }
   }
 }
 

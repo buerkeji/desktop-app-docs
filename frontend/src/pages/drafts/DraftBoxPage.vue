@@ -9,7 +9,6 @@ import {
   isVirtualLocalDraftTarget,
   listLocalDrafts,
   loadLocalDraft,
-  markDraftSubmitted,
   saveLocalDraft,
   type LocalDraftListItem,
 } from '../../services/local-draft.service';
@@ -160,7 +159,7 @@ async function loadDraftItems() {
     drafts.value = items.filter((d) => {
       if (seen.has(d.key)) return false;
       seen.add(d.key);
-      return true;
+      return d.targetId === 'new' || isVirtualLocalDraftTarget(d.targetId);
     });
   } catch (error) {
     Message.error(error instanceof Error ? error.message : '获取草稿列表失败');
@@ -260,11 +259,9 @@ function handleBatchDelete() {
 
       for (const item of itemsToDelete) {
         try {
-          await clearLocalDraft(buildLocalDraftKey(currentTenantId.value!, item.contentType, item.targetId), {
-            tenantId: currentTenantId.value!,
-            contentType: item.contentType,
-            targetId: item.targetId,
-          });
+          const dq = buildDraftQuery(item);
+          if (!dq) continue;
+          await clearLocalDraft(buildLocalDraftKey(currentTenantId.value!, item.contentType, item.targetId), dq);
           drafts.value = drafts.value.filter((draft) => draft.key !== item.key);
           successCount += 1;
         } catch {
@@ -309,7 +306,9 @@ const categoryLabelMap = computed(() => {
 });
 
 const draftCategoryName = (draft: LocalDraftListItem): string => {
-  const categoryId = (draft as any).payload?.form?.categoryId as number | undefined;
+  const payload = (draft as any).payload;
+  if (!payload) return '';
+  const categoryId = payload?.form?.categoryId ?? payload?.categoryId;
   if (categoryId === undefined || categoryId === null) return '';
   return categoryLabelMap.value.get(categoryId) || '';
 };
@@ -341,6 +340,15 @@ const availableCategoryOptions = computed(() => {
   return [];
 });
 
+function buildDraftQuery(item: LocalDraftListItem): { tenantId: number; contentType: LocalDraftContentType; targetId: string } | undefined {
+  if (!currentTenantId.value) return undefined;
+  return {
+    tenantId: currentTenantId.value,
+    contentType: item.contentType,
+    targetId: item.targetId,
+  };
+}
+
 function openBatchCategoryModal() {
   if (selectedCount.value === 0) {
     Message.warning('请先勾选要设置分类的草稿');
@@ -370,17 +378,17 @@ async function confirmBatchCategory() {
   for (const item of itemsToUpdate) {
     try {
       const key = buildLocalDraftKey(currentTenantId.value!, item.contentType, item.targetId);
-      const existing = await loadLocalDraft<{ form: { categoryId?: number } }>(key);
+      const query = buildDraftQuery(item);
+      const existing = await loadLocalDraft<Record<string, unknown>>(key, query);
       if (existing) {
-        const raw = existing as unknown as Record<string, unknown>;
-        if (!raw.payload) {
-          raw.payload = {};
+        const payload = existing.payload;
+        if (payload && typeof payload === 'object') {
+          if ('form' in payload && payload.form && typeof payload.form === 'object') {
+            (payload.form as Record<string, unknown>).categoryId = batchCategoryForm.categoryId;
+          } else {
+            payload.categoryId = batchCategoryForm.categoryId;
+          }
         }
-        const payload = raw.payload as Record<string, unknown>;
-        if (!payload.form) {
-          payload.form = {};
-        }
-        (payload.form as Record<string, unknown>).categoryId = batchCategoryForm.categoryId;
         await saveLocalDraft(key, existing);
       }
       successCount += 1;
@@ -389,6 +397,7 @@ async function confirmBatchCategory() {
     }
   }
 
+  await loadDraftItems();
   batchCategoryModalVisible.value = false;
   batchCategoryChanging.value = false;
 
@@ -430,13 +439,31 @@ async function confirmBatchUpload() {
     batchUploadProgress.current += 1;
     try {
       const key = buildLocalDraftKey(currentTenantId.value!, item.contentType, item.targetId);
-      const existing = await loadLocalDraft<{ form: Record<string, unknown> }>(key);
-      if (!existing || !existing.payload?.form) {
+      const query = buildDraftQuery(item);
+      const existing = await loadLocalDraft<{ form: Record<string, unknown> }>(key, query);
+      if (!existing || !existing.payload) {
+        console.warn('[BatchUpload] 草稿数据不存在', item.title || item.key);
         failCount += 1;
         continue;
       }
 
-      const form = { ...existing.payload.form };
+      const rawForm = existing.payload.form || (existing.payload as Record<string, unknown>);
+      const form = { ...rawForm };
+
+      const missingFields: string[] = [];
+      if (!form.title) missingFields.push('标题');
+      if (item.contentType === 'tool') {
+        if (!form.url) missingFields.push('链接');
+        if (!form.description) missingFields.push('简介');
+      }
+      if (item.contentType === 'article' && !form.content) missingFields.push('正文');
+      if (!form.categoryId) missingFields.push('分类');
+
+      if (missingFields.length > 0) {
+        console.warn('[BatchUpload]', `"${item.title || '未命名草稿'}"缺少必填字段：${missingFields.join('、')}`);
+        failCount += 1;
+        continue;
+      }
 
       const scenePrefix = item.contentType === 'tool' ? 'tool' : 'article';
 
@@ -501,36 +528,30 @@ async function confirmBatchUpload() {
       }
       totalFailedRemoteImages += contentResult.failedCount;
 
-      const payload = { ...form, tags: String(form.tagsText || '').split(',').filter(Boolean) };
+      const payload: Record<string, unknown> = { ...form, tags: String(form.tagsText || '').split(',').filter(Boolean) };
+      if (payload.icon === '') payload.icon = undefined;
+      if (payload.thumbnail === '') payload.thumbnail = undefined;
 
-      if (item.contentType === 'tool') {
-        if (!form.title || !form.url) {
-          failCount += 1;
-          continue;
-        }
-        if (item.targetId === 'new' || isVirtualLocalDraftTarget(item.targetId)) {
+      if (item.targetId === 'new' || isVirtualLocalDraftTarget(item.targetId)) {
+        if (item.contentType === 'tool') {
           await createTool(
             { apiBaseUrl: tenant.apiBaseUrl },
             token.accessToken,
             payload as any,
           );
         } else {
-          await updateTool(
+          await createArticle(
             { apiBaseUrl: tenant.apiBaseUrl },
             token.accessToken,
-            item.targetId,
             payload as any,
           );
         }
       } else {
-        if (!form.title || !form.content) {
-          failCount += 1;
-          continue;
-        }
-        if (item.targetId === 'new' || isVirtualLocalDraftTarget(item.targetId)) {
-          await createArticle(
+        if (item.contentType === 'tool') {
+          await updateTool(
             { apiBaseUrl: tenant.apiBaseUrl },
             token.accessToken,
+            item.targetId,
             payload as any,
           );
         } else {
@@ -543,26 +564,25 @@ async function confirmBatchUpload() {
         }
       }
 
-      await markDraftSubmitted(key);
-      const draft = drafts.value.find((d) => d.key === item.key);
-      if (draft) {
-        (draft as any).submittedAt = new Date().toISOString();
-      }
+      await clearLocalDraft(key, query);
       successCount += 1;
-    } catch {
+    } catch (error) {
+      console.error('[BatchUpload]', item.title || item.key, error);
       failCount += 1;
     }
   }
 
+  await loadDraftItems();
+  selectedKeys.value = [];
   batchUploadModalVisible.value = false;
   batchUploading.value = false;
-  selectedKeys.value = selectedKeys.value.filter((k) => !unsubmitted.some((d) => d.key === k));
 
   let message = `已上传 ${successCount} 个草稿，${failCount} 个上传失败`;
   if (totalFailedRemoteImages > 0) {
     message += `，${totalFailedRemoteImages} 张远程图片下载失败（已保留原链接）`;
   }
   if (failCount > 0) {
+    message += `，请确认草稿的必填字段（工具：标题+链接+分类+简介；文章：标题+分类+正文）完整`;
     Message.warning(message);
   } else {
     Message.success(message);
@@ -812,7 +832,7 @@ watch(
       <template v-if="!batchUploading">
         <a-alert type="info" style="margin-bottom: 16px;">
           将上传 {{ batchUploadProgress.total }} 个未上传的草稿到服务端。
-          上传前请确保草稿标题和必填字段（工具：标题+链接；文章：标题+正文）完整。
+          上传前请确保草稿必填字段完整（工具：标题+链接+分类+简介；文章：标题+分类+正文）。
         </a-alert>
         <a-table
           :data="unSubmittedSelectedKeys.slice(0, 10)"

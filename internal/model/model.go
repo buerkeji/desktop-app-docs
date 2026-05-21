@@ -208,6 +208,7 @@ type SaveLocalDraftInput struct {
 	TargetID    string `json:"targetId"`
 	Title       string `json:"title"`
 	PayloadJSON string `json:"payloadJson"`
+	SubmittedAt string `json:"submittedAt"`
 }
 
 type LocalDraftItem struct {
@@ -218,6 +219,7 @@ type LocalDraftItem struct {
 	Title       string `json:"title,omitempty"`
 	PayloadJSON string `json:"payloadJson"`
 	UpdatedAt   string `json:"updatedAt"`
+	SubmittedAt string `json:"submittedAt"`
 }
 
 type RemoteDesktopAPIRequestInput struct {

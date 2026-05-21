@@ -553,6 +553,7 @@ export namespace model {
 	    title?: string;
 	    payloadJson: string;
 	    updatedAt: string;
+	    submittedAt: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new LocalDraftItem(source);
@@ -567,6 +568,7 @@ export namespace model {
 	        this.title = source["title"];
 	        this.payloadJson = source["payloadJson"];
 	        this.updatedAt = source["updatedAt"];
+	        this.submittedAt = source["submittedAt"];
 	    }
 	}
 	export class LocalDraftListInput {
@@ -817,6 +819,7 @@ export namespace model {
 	    targetId: string;
 	    title: string;
 	    payloadJson: string;
+	    submittedAt: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SaveLocalDraftInput(source);
@@ -829,6 +832,7 @@ export namespace model {
 	        this.targetId = source["targetId"];
 	        this.title = source["title"];
 	        this.payloadJson = source["payloadJson"];
+	        this.submittedAt = source["submittedAt"];
 	    }
 	}
 	export class SaveTenantAuthInput {

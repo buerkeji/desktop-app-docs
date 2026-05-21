@@ -1531,15 +1531,38 @@ export function useCollectorPage() {
     draftGenerating.value = contentType;
     try {
       const targetId = buildCollectorDraftId(contentType);
+      const isTool = contentType === 'tool';
       await saveLocalDraft(buildLocalDraftKey(currentTenantId.value, contentType, targetId), {
         tenantId: currentTenantId.value,
         contentType,
         targetId,
         title: toolMapping.title || result.value.title || '采集草稿',
-        payload: {
-          content: contentType === 'tool' ? toolMapping.content || result.value.contentHtml : articleMapping.content || result.value.contentHtml,
-          sourceUrl: result.value.finalUrl,
-        },
+        payload: isTool
+          ? {
+              title: toolMapping.title,
+              url: toolMapping.url,
+              website: toolMapping.website,
+              icon: toolMapping.icon,
+              thumbnail: toolMapping.thumbnail,
+              description: toolMapping.description,
+              content: toolMapping.content || result.value.contentHtml,
+              featuresText: toolMapping.featuresText,
+              tagsText: toolMapping.tagsText,
+              metaTitle: toolMapping.metaTitle,
+              metaKeywords: toolMapping.metaKeywords,
+              metaDescription: toolMapping.metaDescription,
+            }
+          : {
+              title: articleMapping.title,
+              thumbnail: articleMapping.thumbnail,
+              excerpt: articleMapping.excerpt,
+              content: articleMapping.content || result.value.contentHtml,
+              publishedAt: articleMapping.publishedAt,
+              tagsText: articleMapping.tagsText,
+              metaTitle: articleMapping.metaTitle,
+              metaKeywords: articleMapping.metaKeywords,
+              metaDescription: articleMapping.metaDescription,
+            },
       });
       Message.success(contentType === 'tool' ? '已生成工具草稿' : '已生成文章草稿');
       void router.push({

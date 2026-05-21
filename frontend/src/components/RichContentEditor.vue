@@ -1,5 +1,5 @@
-﻿﻿﻿﻿﻿﻿<script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+﻿﻿﻿﻿﻿﻿﻿<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
 import { Message } from '@arco-design/web-vue';
 import { Editor, Toolbar } from '@wangeditor/editor-for-vue';
 import type { IDomEditor, IEditorConfig, IToolbarConfig } from '@wangeditor/editor';
@@ -38,6 +38,7 @@ type EditorImageInsertFn = (src: string, alt: string, href: string) => void;
 const imageUploading = ref(false);
 const editorRef = shallowRef<IDomEditor>();
 const syncingModelValue = ref(false);
+let syncGeneration = 0;
 const toolbarConfig: Partial<IToolbarConfig> = {};
 const editorHeightStyle = computed(() => ({
   minHeight: `${props.minHeight}px`,
@@ -83,11 +84,15 @@ function syncEditorHtml(value: string) {
     return;
   }
 
+  syncGeneration++;
+  const currentGen = syncGeneration;
   syncingModelValue.value = true;
   editor.setHtml(nextValue);
-  window.setTimeout(() => {
-    syncingModelValue.value = false;
-  }, 0);
+  nextTick(() => {
+    if (syncGeneration === currentGen) {
+      syncingModelValue.value = false;
+    }
+  });
 }
 
 function handleEditorCreated(editor: IDomEditor) {

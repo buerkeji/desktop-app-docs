@@ -525,19 +525,23 @@ func (s *DesktopStore) SaveLocalDraft(input model.SaveLocalDraftInput) (*model.L
 	now := time.Now().Format(time.RFC3339)
 	title := strings.TrimSpace(input.Title)
 
+	submittedAt := strings.TrimSpace(input.SubmittedAt)
+
 	_, err = s.db.Exec(
-		`INSERT INTO local_drafts (tenant_id, content_type, target_id, title, payload_json, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?)
+		`INSERT INTO local_drafts (tenant_id, content_type, target_id, title, payload_json, updated_at, submitted_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(tenant_id, content_type, target_id) DO UPDATE SET
 		   title = excluded.title,
 		   payload_json = excluded.payload_json,
-		   updated_at = excluded.updated_at`,
+		   updated_at = excluded.updated_at,
+		   submitted_at = CASE WHEN excluded.submitted_at != '' THEN excluded.submitted_at ELSE submitted_at END`,
 		tenantID,
 		contentType,
 		targetID,
 		title,
 		payloadJSON,
 		now,
+		submittedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("save local draft: %w", err)
@@ -557,7 +561,7 @@ func (s *DesktopStore) GetLocalDraft(input model.LocalDraftQueryInput) (*model.L
 	}
 
 	row := s.db.QueryRow(
-		`SELECT id, tenant_id, content_type, target_id, title, payload_json, updated_at
+		`SELECT id, tenant_id, content_type, target_id, title, payload_json, updated_at, submitted_at
 		 FROM local_drafts
 		 WHERE tenant_id = ? AND content_type = ? AND target_id = ?
 		 LIMIT 1`,
@@ -567,7 +571,7 @@ func (s *DesktopStore) GetLocalDraft(input model.LocalDraftQueryInput) (*model.L
 	)
 
 	var item model.LocalDraftItem
-	err = row.Scan(&item.ID, &item.TenantID, &item.ContentType, &item.TargetID, &item.Title, &item.PayloadJSON, &item.UpdatedAt)
+	err = row.Scan(&item.ID, &item.TenantID, &item.ContentType, &item.TargetID, &item.Title, &item.PayloadJSON, &item.UpdatedAt, &item.SubmittedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -603,7 +607,7 @@ func (s *DesktopStore) ListLocalDrafts(input model.LocalDraftListInput) ([]model
 	}
 
 	contentType := strings.TrimSpace(input.ContentType)
-	query := `SELECT id, tenant_id, content_type, target_id, title, payload_json, updated_at
+	query := `SELECT id, tenant_id, content_type, target_id, title, payload_json, updated_at, submitted_at
 		FROM local_drafts
 		WHERE tenant_id = ?`
 	args := []any{input.TenantID}
@@ -622,7 +626,7 @@ func (s *DesktopStore) ListLocalDrafts(input model.LocalDraftListInput) ([]model
 	items := make([]model.LocalDraftItem, 0)
 	for rows.Next() {
 		var item model.LocalDraftItem
-		if err := rows.Scan(&item.ID, &item.TenantID, &item.ContentType, &item.TargetID, &item.Title, &item.PayloadJSON, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.TenantID, &item.ContentType, &item.TargetID, &item.Title, &item.PayloadJSON, &item.UpdatedAt, &item.SubmittedAt); err != nil {
 			return nil, fmt.Errorf("scan local draft: %w", err)
 		}
 		items = append(items, item)
@@ -929,6 +933,7 @@ func (s *DesktopStore) migrate() error {
 			title TEXT NOT NULL DEFAULT '',
 			payload_json TEXT NOT NULL,
 			updated_at TEXT NOT NULL,
+			submitted_at TEXT NOT NULL DEFAULT '',
 			FOREIGN KEY(tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 		);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_local_drafts_scope ON local_drafts(tenant_id, content_type, target_id);`,
@@ -1059,6 +1064,7 @@ func (s *DesktopStore) migrate() error {
 		`ALTER TABLE media_tasks ADD COLUMN height INTEGER NOT NULL DEFAULT 0;`,
 		`ALTER TABLE media_tasks ADD COLUMN error_message TEXT NOT NULL DEFAULT '';`,
 		`ALTER TABLE media_tasks ADD COLUMN response_json TEXT NOT NULL DEFAULT '';`,
+		`ALTER TABLE local_drafts ADD COLUMN submitted_at TEXT NOT NULL DEFAULT '';`,
 	}
 
 	for _, statement := range alterStatements {

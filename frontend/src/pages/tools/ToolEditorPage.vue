@@ -19,7 +19,6 @@ import {
   clearLocalDraft,
   isVirtualLocalDraftTarget,
   loadLocalDraft,
-  markDraftSubmitted,
   saveLocalDraft,
   type LocalDraftContentType,
 } from '../../services/local-draft.service';
@@ -312,19 +311,17 @@ async function prepareSubmitPayload(): Promise<ToolUpsertPayload> {
     form.content = contentResult.html;
   }
 
-  if (!isEditMode.value) {
-    const remoteResult = await uploadRemoteHtmlImages(content, tenant, accessToken, {
-      mediaCategoryId: form.mediaCategoryId,
-      uploadScene: 'tool-content',
-      fileNamePrefix: `${prefix}-content`,
-    });
-    if (remoteResult.uploaded.length > 0) {
-      content = remoteResult.html;
-      form.content = remoteResult.html;
-    }
-    if (remoteResult.failedCount > 0) {
-      Message.warning(`${remoteResult.failedCount} 张远程图片下载失败，已保留原链接`);
-    }
+  const remoteResult = await uploadRemoteHtmlImages(content, tenant, accessToken, {
+    mediaCategoryId: form.mediaCategoryId,
+    uploadScene: 'tool-content',
+    fileNamePrefix: `${prefix}-content`,
+  });
+  if (remoteResult.uploaded.length > 0) {
+    content = remoteResult.html;
+    form.content = remoteResult.html;
+  }
+  if (remoteResult.failedCount > 0) {
+    Message.warning(`${remoteResult.failedCount} 张远程图片下载失败，已保留原链接`);
   }
 
   return buildPayload({ icon, thumbnail, content });
@@ -409,10 +406,10 @@ function applyDraftPayload(
 
 async function restoreDraft(silent = false, context = createDraftContext()) {
   const draft = await loadLocalDraft<ToolEditorDraftPayload | ToolEditorFormState>(context.key, context.query);
-  if (!draft || draft.submittedAt) {
+  if (!draft) {
     hasDraft.value = false;
     draftUpdatedAt.value = '';
-    if (!silent && !draft) {
+    if (!silent) {
       Message.warning('当前没有可恢复的本地草稿');
     }
     return false;
@@ -431,6 +428,10 @@ async function persistDraft(silent = true, context = createDraftContext()) {
   autoSaving.value = silent;
   autoSaveError.value = '';
   try {
+    const latestEditorHtml = contentEditorRef.value?.getCurrentHtml();
+    if (typeof latestEditorHtml === 'string') {
+      form.content = latestEditorHtml;
+    }
     const saved = await saveLocalDraft(context.key, {
       tenantId: context.tenantId,
       contentType: 'tool',
@@ -538,15 +539,10 @@ async function hydrateEditorContext() {
 
   resetForm();
   const context = createDraftContext();
-  const restoredDraft =
-    openedFromDraftBox.value
-      ? await restoreDraft(true, context)
-      : false;
-  const backgroundDetailLoad = openedFromDraftBox.value && restoredDraft;
 
   await Promise.all([
     initialiseDictionary(),
-    loadDetail(backgroundDetailLoad),
+    loadDetail(false),
   ]);
   ensureDefaultMediaCategory();
   await restoreDraft(true, context);
@@ -598,16 +594,7 @@ async function handleSubmit() {
           payload,
         );
     const submitContext = createDraftContext();
-    if (isEditMode.value) {
-      await saveLocalDraft(submitContext.key, {
-        tenantId: submitContext.tenantId,
-        contentType: 'tool',
-        targetId: submitContext.targetId,
-        title: form.title.trim(),
-        payload: getDraftPayload(),
-      });
-    }
-    await markDraftSubmitted(submitContext.key, submitContext.query);
+    await clearLocalDraft(submitContext.key, submitContext.query);
     if (autoSaveTimer) {
       window.clearTimeout(autoSaveTimer);
       autoSaveTimer = undefined;
